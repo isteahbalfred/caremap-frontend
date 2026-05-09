@@ -15,7 +15,7 @@ export default function AdminDashboard() {
   const [pending, setPending] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'stats' | 'pharmacies' | 'users'>('stats');
+ const [activeTab, setActiveTab] = useState<'stats' | 'pharmacies' | 'users' | 'report'>('stats');
 
   const loadData = async () => {
     try {
