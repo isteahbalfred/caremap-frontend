@@ -23,6 +23,9 @@ export default function HomePage() {
               </span>
               {user?.role === 'SUPER_ADMIN' && (
                 <Link to="/admin" className="btn-primary text-sm px-3 py-1.5">
+                  <Link to="/map" className="text-gray-600 hover:text-primary-500">
+                  Carte
+                </Link>
                   Admin
                 </Link>
               )}
