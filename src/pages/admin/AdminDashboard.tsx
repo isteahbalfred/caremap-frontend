@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { Spinner } from '../../components/ui/Spinner';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import ReportGenerator from './ReportGenerator';
 
 export default function AdminDashboard() {
   const { user } = useAppSelector(s => s.auth);
@@ -47,6 +48,7 @@ export default function AdminDashboard() {
     { key: 'stats', label: '📊 Statistiques' },
     { key: 'pharmacies', label: `🏪 Validations (${pending.length})` },
     { key: 'users', label: '👥 Utilisateurs' },
+    { key: 'report', label: '📄 Rapport de Stage' },
   ];
 
   return (
@@ -148,6 +150,8 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {activeTab === 'report' && <ReportGenerator />}
+            
             {/* Utilisateurs */}
             {activeTab === 'users' && (
               <div className="card">
