@@ -26,6 +26,9 @@ export default function HomePage() {
                   <Link to="/map" className="text-gray-600 hover:text-primary-500">
                   Carte
                 </Link>
+                <Link to="/clinics" className="text-gray-600 hover:text-primary-500">
+                  Cliniques
+                </Link>
                   Admin
                 </Link>
               )}

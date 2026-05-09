@@ -12,6 +12,7 @@ const SearchPage = lazy(() => import('./pages/public/SearchPage'));
 const MapPage = lazy(() => import('./pages/public/MapPage'));
 const PharmacyDashboard = lazy(() => import('./pages/pharmacy/PharmacyDashboard'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const ClinicsPage = lazy(() => import('./pages/public/ClinicsPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -35,6 +36,7 @@ function App() {
         <Route path="/map" element={<MapPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/clinics" element={<ClinicsPage />} />
 
         <Route element={<ProtectedRoute role="PHARMACY_ADMIN" />}>
           <Route path="/pharmacy" element={<PharmacyDashboard />} />
