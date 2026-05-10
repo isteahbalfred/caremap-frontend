@@ -8,7 +8,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white">
-
       {/* ── NAVBAR ─────────────────────────────────────────── */}
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
@@ -21,7 +20,6 @@ export default function HomePage() {
             />
             <span className="text-2xl font-bold text-primary-700">CareMap</span>
           </div>
-
           <div className="hidden md:flex items-center gap-6">
             <Link to="/search" className="text-gray-600 hover:text-primary-600 font-medium transition-colors">
               Médicaments
@@ -33,7 +31,6 @@ export default function HomePage() {
               Cliniques
             </Link>
           </div>
-
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
               <>
@@ -85,7 +82,6 @@ export default function HomePage() {
             CareMap connecte les patients aux pharmacies et cliniques d'Haïti.
             Comparez les prix, vérifiez les stocks et localisez les soins dont vous avez besoin.
           </p>
-
           {/* Barre de recherche rapide */}
           <div className="bg-white rounded-2xl p-2 flex flex-col md:flex-row gap-2 max-w-2xl mx-auto shadow-2xl">
             <input
@@ -106,7 +102,6 @@ export default function HomePage() {
               Rechercher
             </Link>
           </div>
-
           {/* Stats rapides */}
           <div className="flex justify-center gap-8 mt-12 flex-wrap">
             {[
@@ -134,7 +129,6 @@ export default function HomePage() {
               Une solution complète pour améliorer l'accès aux soins en Haïti
             </p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
@@ -258,7 +252,7 @@ export default function HomePage() {
               <div>Stack: React + Express + PostgreSQL</div>
               <div>Déployé sur Vercel + Render</div>
               <div className="pt-2">
-                
+                <a 
                   href="https://github.com/isteahbalfred"
                   target="_blank"
                   rel="noopener noreferrer"
