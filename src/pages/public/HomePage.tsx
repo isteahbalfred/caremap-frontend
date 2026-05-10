@@ -239,7 +239,7 @@ export default function HomePage() {
                 color: 'from-purple-500 to-pink-500',
                 gradient: 'from-purple-50 to-pink-50',
               },
-            ].map((f, idx) => (
+            ].map(f => (
               <div
                 key={f.title}
                 className="group relative bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-slate-100"
@@ -290,7 +290,7 @@ export default function HomePage() {
                   <p className="text-slate-600 leading-relaxed">{s.desc}</p>
                 </div>
                 {idx < 2 && (
-                  <div className="hidden lg:block absolute top-1/3 left-full w-full">
+                  <div className="hidden lg:block absolute top-1/3 -right-12 w-12">
                     <div className="text-4xl text-indigo-300">→</div>
                   </div>
                 )}
@@ -356,7 +356,7 @@ export default function HomePage() {
               <div className="space-y-3 text-sm">
                 {['Rechercher', 'Carte', 'Cliniques', 'S\'inscrire', 'Médicaments'].map(item => (
                   <div key={item}>
-                    <Link to={`/${item.toLowerCase()}`} className="hover:text-white transition-colors">
+                    <Link to={`/${item.toLowerCase() === 'rechercher' ? 'search' : item.toLowerCase() === 'carte' ? 'map' : item.toLowerCase() === 'cliniques' ? 'clinics' : item.toLowerCase() === 's\'inscrire' ? 'register' : 'search'}`} className="hover:text-white transition-colors">
                       {item}
                     </Link>
                   </div>
