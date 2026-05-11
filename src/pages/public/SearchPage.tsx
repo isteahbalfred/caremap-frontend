@@ -249,8 +249,9 @@ export default function SearchPage() {
                                   stock.quantity <= stock.threshold ? 'warning' : 'success'
                                 }>
                                   {stock.quantity === 0 ? '❌ Rupture' :
-                                   stock.quantity <= stock.threshold ? `⚠️ Stock faible (${stock.quantity})` :
-                                   `✅ En stock (${stock.quantity})`}
+                                  stock.quantity <= stock.threshold
+                                    ? `Stock faible (${stock.quantity})`
+                                    : `En stock (${stock.quantity})`}
                                 </Badge>
                               </div>
                               
