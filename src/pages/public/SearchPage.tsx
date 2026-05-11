@@ -245,14 +245,16 @@ export default function SearchPage() {
                                   {Number(stock.price).toFixed(2)} HTG
                                 </p>
                                 <Badge variant={
-                                  stock.quantity === 0 ? 'error' :
-                                  stock.quantity <= stock.threshold ? 'warning' : 'success'
-                                }>
-                                  {stock.quantity === 0 ? '❌ Rupture' :
-                                  stock.quantity <= stock.threshold
-                                    ? `Stock faible (${stock.quantity})`
-                                    : `En stock (${stock.quantity})`}
-                                </Badge>
+                                stock.quantity === 0 ? 'error' :
+                                stock.quantity <= stock.threshold ? 'warning' : 'success'
+                              }>
+                                {stock.quantity === 0
+                                  ? 'Rupture de stock'
+                                  : stock.quantity <= stock.threshold
+                                  ? 'Stock faible'
+                                  : 'En stock'}
+                                {' '}({stock.quantity})
+                              </Badge>
                               </div>
                               
                                 href={`https://maps.google.com/?q=${stock.pharmacy?.latitude},${stock.pharmacy?.longitude}`}
