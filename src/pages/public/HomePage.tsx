@@ -128,7 +128,7 @@ export default function HomePage() {
         <div className="relative max-w-7xl mx-auto px-8 py-32 text-center z-10">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-full px-5 py-2 mb-8 animate-slideDown">
             <span className="text-2xl">🇭🇹</span>
-            <span className="text-white/90 text-sm font-medium">Plateforme médicale premium pour Haïti</span>
+            <span className="text-white/90 text-sm font-medium">Plateforme médicale Haïti</span>
           </div>
           
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-white mb-8 leading-tight animate-slideUp">
@@ -205,7 +205,7 @@ export default function HomePage() {
               Une plateforme d'exception
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-              Découvrez une expérience unique pour améliorer l'accès aux soins en Haïti
+              Découvrez une expérience unique pour améliorer l'accès aux soins
             </p>
           </div>
           
@@ -378,22 +378,22 @@ export default function HomePage() {
               <h4 className="text-white font-semibold mb-4 text-lg">Informations</h4>
               <div className="space-y-3 text-sm">
                 <div className="flex items-center gap-2">
-                  <span>📍</span> Port-au-Prince, Haïti
+                  <span>📍</span> Saint Marc, Haïti
                 </div>
                 <div className="flex items-center gap-2">
                   <span>📧</span> contact@caremap.ht
                 </div>
                 <div className="flex items-center gap-2">
-                  <span>📞</span> +509 1234 5678
+                  <span>📞</span> +509 4270 4652
                 </div>
               </div>
             </div>
           </div>
           
           <div className="border-t border-slate-800 pt-8 text-center text-sm">
-            <p>© 2026 CareMap — Projet de stage universitaire ISTEAH — Haïti</p>
+            <p>© 2026 CareMap</p>
             <p className="mt-2">
-              Stack: React + TypeScript + Express + PostgreSQL | Déployé sur Vercel + Render
+              A votre service pour améliorer l'accès aux soins en Haïti. Conçu avec ❤️ par une équipe passionnée.
             </p>
           </div>
         </div>
