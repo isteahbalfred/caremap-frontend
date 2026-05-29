@@ -164,7 +164,7 @@ export default function SearchPage() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Spinner size="lg" />
-            <p className="text-gray-500">Recherche en cours...</p>
+            <p className="text-gray-500">Recherche des médicaments en cours...</p>
           </div>
         ) : (
           <>
