@@ -428,7 +428,6 @@ export default function ReportGenerator() {
                 <label className="text-xs text-gray-500 font-medium">Branche Git</label>
                 <input
                   type="text"
-                  className="input mt-1"
                   value={member.branch}
                   readOnly
                   className="input mt-1 bg-gray-50 text-gray-500"
