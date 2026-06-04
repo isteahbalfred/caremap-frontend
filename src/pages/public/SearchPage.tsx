@@ -18,20 +18,29 @@ export default function SearchPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [maxPrice, setMaxPrice] = useState("");
   const LIMIT = 10;
 
   useEffect(() => {
     medicationService.getCategories().then(res => setCategories(res.data.data));
     const q = searchParams.get("q") || "";
-    doSearch(q, "", "", 1);
+    doSearch(q, "", "", 1, false, "");
   }, []);
 
-  const doSearch = async (s, c, cat, p) => {
+  const doSearch = async (s, c, cat, p, stock, price) => {
     setLoading(true);
     setSearched(true);
     try {
       const res = await medicationService.getAll({ search: s, city: c, categoryId: cat, page: p, limit: LIMIT });
-      setMedications(res.data.data);
+      let results = res.data.data;
+      if (stock) {
+        results = results.filter(med => med.stocks && med.stocks.some(s => s.quantity > 0));
+      }
+      if (price && Number(price) > 0) {
+        results = results.filter(med => med.stocks && med.stocks.some(s => Number(s.price) <= Number(price)));
+      }
+      setMedications(results);
       setTotal(res.data.meta ? res.data.meta.total : 0);
       setTotalPages(res.data.meta ? res.data.meta.pages : 1);
       setPage(p);
@@ -42,17 +51,31 @@ export default function SearchPage() {
 
   const handleSearch = (e) => {
     if (e) e.preventDefault();
-    doSearch(search, city, categoryId, 1);
+    doSearch(search, city, categoryId, 1, inStockOnly, maxPrice);
   };
 
   const handleCategory = (id) => {
     setCategoryId(id);
-    doSearch(search, city, id, 1);
+    doSearch(search, city, id, 1, inStockOnly, maxPrice);
   };
 
   const handlePageChange = (newPage) => {
-    doSearch(search, city, categoryId, newPage);
+    doSearch(search, city, categoryId, newPage, inStockOnly, maxPrice);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleStockFilter = () => {
+    const newValue = !inStockOnly;
+    setInStockOnly(newValue);
+    doSearch(search, city, categoryId, 1, newValue, maxPrice);
+  };
+
+  const handleMaxPrice = (e) => {
+    setMaxPrice(e.target.value);
+  };
+
+  const handleApplyPrice = () => {
+    doSearch(search, city, categoryId, 1, inStockOnly, maxPrice);
   };
 
   const getStockLabel = (stock) => {
@@ -111,7 +134,7 @@ export default function SearchPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-6 py-8">
-        <div className="flex flex-wrap gap-3 mb-6 items-center">
+        <div className="flex flex-wrap gap-3 mb-4 items-center">
           <span className="text-sm text-gray-500 font-medium">Categorie :</span>
           <button
             onClick={() => handleCategory("")}
@@ -128,6 +151,40 @@ export default function SearchPage() {
               {cat.name}
             </button>
           ))}
+        </div>
+
+        <div className="flex flex-wrap gap-4 mb-6 items-center bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="inStock"
+              checked={inStockOnly}
+              onChange={handleStockFilter}
+              className="w-4 h-4 accent-primary-600 cursor-pointer"
+            />
+            <label htmlFor="inStock" className="text-sm text-gray-600 font-medium cursor-pointer">
+              En stock uniquement
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 font-medium">Prix max :</span>
+            <input
+              type="number"
+              className="w-28 px-3 py-1.5 text-gray-800 border border-gray-200 rounded-lg outline-none text-sm"
+              placeholder="ex: 500"
+              value={maxPrice}
+              onChange={handleMaxPrice}
+            />
+            <span className="text-sm text-gray-400">HTG</span>
+            <button
+              onClick={handleApplyPrice}
+              className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              Appliquer
+            </button>
+          </div>
+
           <div className="ml-auto flex items-center gap-2">
             <span className="text-sm text-gray-500">Trier :</span>
             <select
@@ -156,6 +213,8 @@ export default function SearchPage() {
                 <span> pour <span className="text-primary-600 font-medium">{search}</span></span>
               )}
               <span className="ml-2 text-gray-400">- Page {page} sur {totalPages}</span>
+              {inStockOnly && <span className="ml-2 bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-medium">En stock uniquement</span>}
+              {maxPrice && <span className="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-medium">Max {maxPrice} HTG</span>}
             </p>
 
             {medications.length === 0 && (
