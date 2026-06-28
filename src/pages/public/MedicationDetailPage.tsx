@@ -1,4 +1,5 @@
-﻿import { useState, useEffect } from "react";
+﻿import { Medication, MedicationStock } from "../../types";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { medicationService } from "../../services/medicationService";
 import { Spinner } from "../../components/ui/Spinner";
@@ -6,7 +7,7 @@ import { Badge } from "../../components/ui/Badge";
 
 export default function MedicationDetailPage() {
   const { id } = useParams();
-  const [medication, setMedication] = useState(null);
+  const [medication, setMedication] = useState<Medication | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -19,13 +20,13 @@ export default function MedicationDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const getStockLabel = (stock) => {
+  const getStockLabel = (stock: MedicationStock) => {
     if (stock.quantity === 0) return "Rupture";
     if (stock.quantity <= stock.threshold) return "Stock faible";
     return "En stock";
   };
 
-  const getStockVariant = (stock) => {
+  const getStockVariant = (stock: MedicationStock) => {
     if (stock.quantity === 0) return "error";
     if (stock.quantity <= stock.threshold) return "warning";
     return "success";

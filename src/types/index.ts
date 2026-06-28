@@ -46,3 +46,24 @@ export interface Category {
   id: string;
   name: string;
 }
+export interface DashboardStats {
+  totalUsers: number;
+  totalPharmacies: number;
+  validatedPharmacies: number;
+  pendingPharmacies: number;
+  totalClinics: number;
+  totalMedications: number;
+}
+
+export interface PendingPharmacy {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  phone: string;
+  admin: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+}

@@ -1,4 +1,5 @@
-﻿import { useState, useEffect } from "react";
+﻿import { DashboardStats, PendingPharmacy, User, Medication, Category } from "../../types";
+import { useState, useEffect } from "react";
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import { logout } from "../../store/slices/authSlice";
 import { adminService } from "../../services/adminService";
@@ -12,15 +13,15 @@ import ReportGenerator from "./ReportGenerator";
 export default function AdminDashboard() {
   const { user } = useAppSelector(s => s.auth);
   const dispatch = useAppDispatch();
-  const [stats, setStats] = useState(null);
-  const [pending, setPending] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [medications, setMedications] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [pending, setPending] = useState<PendingPharmacy[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [medications, setMedications] = useState<Medication[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("stats");
   const [medForm, setMedForm] = useState({ name: "", genericName: "", description: "", categoryId: "" });
-  const [editingMed, setEditingMed] = useState(null);
+  const [editingMed, setEditingMed] = useState<Medication | null>(null);
   const [medLoading, setMedLoading] = useState(false);
   const [medMessage, setMedMessage] = useState("");
 
@@ -53,15 +54,15 @@ export default function AdminDashboard() {
     loadMedications();
   }, []);
 
-  const handleValidate = async (id, validate) => {
-    await adminService.validatePharmacy(id, validate);
-    loadData();
-  };
+    const handleValidate = async (id: string, validate: boolean) => {
+      await adminService.validatePharmacy(id, validate);
+      loadData();
+    };
 
-  const handleToggleUser = async (id) => {
-    await adminService.toggleUser(id);
-    loadData();
-  };
+    const handleToggleUser = async (id: string) => {
+      await adminService.toggleUser(id);
+      loadData();
+    };
 
   const handleMedSubmit = async () => {
     if (!medForm.name || !medForm.categoryId) {
@@ -88,7 +89,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleEditMed = (med) => {
+  const handleEditMed = (med: Medication) => {
     setEditingMed(med);
     setMedForm({
       name: med.name,
@@ -99,7 +100,7 @@ export default function AdminDashboard() {
     setMedMessage("");
   };
 
-  const handleDeleteMed = async (id) => {
+  const handleDeleteMed = async (id: string) => {
     if (!window.confirm("Voulez-vous vraiment supprimer ce medicament ?")) return;
     try {
       await medicationService.update(id, { name: "__deleted__" });

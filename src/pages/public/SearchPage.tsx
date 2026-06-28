@@ -1,4 +1,5 @@
-﻿import { useState, useEffect } from "react";
+﻿import { Medication, Category, MedicationStock } from "../../types";
+import { useState, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { medicationService } from "../../services/medicationService";
 import { Spinner } from "../../components/ui/Spinner";
@@ -10,8 +11,8 @@ export default function SearchPage() {
   const [search, setSearch] = useState(searchParams.get("q") || "");
   const [city, setCity] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [categories, setCategories] = useState([]);
-  const [medications, setMedications] = useState([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [medications, setMedications] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [sortBy, setSortBy] = useState("name");
@@ -28,12 +29,12 @@ export default function SearchPage() {
     doSearch(q, "", "", 1, false, "");
   }, []);
 
-  const doSearch = async (s, c, cat, p, stock, price) => {
+  const doSearch = async (s: string, c: string, cat: string, p: number, stock: boolean, price: string) => {
     setLoading(true);
     setSearched(true);
     try {
       const res = await medicationService.getAll({ search: s, city: c, categoryId: cat, page: p, limit: LIMIT });
-      let results = res.data.data;
+      let results: Medication[] = res.data.data;
       if (stock) {
         results = results.filter(med => med.stocks && med.stocks.some(s => s.quantity > 0));
       }
@@ -49,17 +50,17 @@ export default function SearchPage() {
     }
   };
 
-  const handleSearch = (e) => {
+  const handleSearch = (e: React.FormEvent) => {
     if (e) e.preventDefault();
     doSearch(search, city, categoryId, 1, inStockOnly, maxPrice);
   };
 
-  const handleCategory = (id) => {
+  const handleCategory = (id: string) => {
     setCategoryId(id);
     doSearch(search, city, id, 1, inStockOnly, maxPrice);
   };
 
-  const handlePageChange = (newPage) => {
+  const handlePageChange = (newPage: number) => {
     doSearch(search, city, categoryId, newPage, inStockOnly, maxPrice);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -70,7 +71,7 @@ export default function SearchPage() {
     doSearch(search, city, categoryId, 1, newValue, maxPrice);
   };
 
-  const handleMaxPrice = (e) => {
+  const handleMaxPrice = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMaxPrice(e.target.value);
   };
 
@@ -78,13 +79,13 @@ export default function SearchPage() {
     doSearch(search, city, categoryId, 1, inStockOnly, maxPrice);
   };
 
-  const getStockLabel = (stock) => {
+  const getStockLabel = (stock: MedicationStock) => {
     if (stock.quantity === 0) return "Rupture";
     if (stock.quantity <= stock.threshold) return "Stock faible";
     return "En stock";
   };
 
-  const getStockVariant = (stock) => {
+  const getStockVariant = (stock: MedicationStock) => {
     if (stock.quantity === 0) return "error";
     if (stock.quantity <= stock.threshold) return "warning";
     return "success";
