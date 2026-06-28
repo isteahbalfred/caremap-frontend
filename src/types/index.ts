@@ -4,8 +4,8 @@ export interface User {
   firstName: string;
   lastName: string;
   role: 'PATIENT' | 'PHARMACY_ADMIN' | 'CLINIC_ADMIN' | 'SUPER_ADMIN';
+  isActive: boolean;
 }
-
 export interface Medication {
   id: string;
   name: string;
@@ -45,4 +45,26 @@ export interface Pharmacy extends PharmacySummary {
 export interface Category {
   id: string;
   name: string;
+}
+export interface DashboardStats {
+  totalUsers: number;
+  totalPharmacies: number;
+  validatedPharmacies: number;
+  pendingPharmacies: number;
+  totalClinics: number;
+  totalMedications: number;
+}
+
+
+export interface PendingPharmacy {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  phone: string;
+  admin: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
 }

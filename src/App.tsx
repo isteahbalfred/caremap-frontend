@@ -1,18 +1,19 @@
-import { useEffect, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAppDispatch } from './store/hooks';
-import { loadUser } from './store/slices/authSlice';
-import { ProtectedRoute } from './components/common/ProtectedRoute';
-import { Spinner } from './components/ui/Spinner';
+﻿import { useEffect, lazy, Suspense } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAppDispatch } from "./store/hooks";
+import { loadUser } from "./store/slices/authSlice";
+import { ProtectedRoute } from "./components/common/ProtectedRoute";
+import { Spinner } from "./components/ui/Spinner";
 
-const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
-const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
-const HomePage = lazy(() => import('./pages/public/HomePage'));
-const SearchPage = lazy(() => import('./pages/public/SearchPage'));
-const MapPage = lazy(() => import('./pages/public/MapPage'));
-const PharmacyDashboard = lazy(() => import('./pages/pharmacy/PharmacyDashboard'));
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
-const ClinicsPage = lazy(() => import('./pages/public/ClinicsPage'));
+const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
+const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
+const HomePage = lazy(() => import("./pages/public/HomePage"));
+const SearchPage = lazy(() => import("./pages/public/SearchPage"));
+const MapPage = lazy(() => import("./pages/public/MapPage"));
+const PharmacyDashboard = lazy(() => import("./pages/pharmacy/PharmacyDashboard"));
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const ClinicsPage = lazy(() => import("./pages/public/ClinicsPage"));
+const MedicationDetailPage = lazy(() => import("./pages/public/MedicationDetailPage"));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -24,7 +25,7 @@ function App() {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+    const token = localStorage.getItem("accessToken");
     if (token) dispatch(loadUser());
   }, [dispatch]);
 
@@ -37,15 +38,13 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/clinics" element={<ClinicsPage />} />
-
+        <Route path="/medications/:id" element={<MedicationDetailPage />} />
         <Route element={<ProtectedRoute role="PHARMACY_ADMIN" />}>
           <Route path="/pharmacy" element={<PharmacyDashboard />} />
         </Route>
-
         <Route element={<ProtectedRoute role="SUPER_ADMIN" />}>
           <Route path="/admin" element={<AdminDashboard />} />
         </Route>
-
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
