@@ -4,8 +4,8 @@ export interface User {
   firstName: string;
   lastName: string;
   role: 'PATIENT' | 'PHARMACY_ADMIN' | 'CLINIC_ADMIN' | 'SUPER_ADMIN';
+  isActive: boolean;
 }
-
 export interface Medication {
   id: string;
   name: string;
@@ -54,6 +54,7 @@ export interface DashboardStats {
   totalClinics: number;
   totalMedications: number;
 }
+
 
 export interface PendingPharmacy {
   id: string;
