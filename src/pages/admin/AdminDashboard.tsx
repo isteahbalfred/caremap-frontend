@@ -182,7 +182,7 @@ export default function AdminDashboard() {
   // Users
   const [userSearch, setUserSearch] = useState("");
   const [userFilter, setUserFilter] = useState("ALL");
-  
+
   const [confirmAction, setConfirmAction] = useState<{ message: string; fn: () => void } | null>(null);
 
   const loadData = async () => {
@@ -219,7 +219,6 @@ export default function AdminDashboard() {
   const handleToggleUser = async (id: string) => {
     await adminService.toggleUser(id);
     loadData();
-    setSelectedUser(null);
   };
 
   const handleDeleteUser = async (id: string) => {
@@ -228,7 +227,6 @@ export default function AdminDashboard() {
       fn: async () => {
         try { await adminService.toggleUser(id); } catch {}
         setConfirmAction(null);
-        setSelectedUser(null);
         loadData();
       }
     });
@@ -540,7 +538,7 @@ export default function AdminDashboard() {
                             </button>
 
                             {/* Contacter par email */}
-                            <a
+                            
                               href={`mailto:${u.email}?subject=CareMap - Message de l'administration`}
                               className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-50 transition-colors"
                               title="Contacter par email"
