@@ -6,8 +6,8 @@ import { adminService } from "../../services/adminService";
 import { medicationService } from "../../services/medicationService";
 import { Link, useNavigate } from "react-router-dom";
 import { Spinner } from "../../components/ui/Spinner";
-import { Badge } from "../../components/ui/Badge";
-import { Button } from "../../components/ui/Button";
+
+
 import ReportGenerator from "./ReportGenerator";
 
 // ── Chatbot ─────────────────────────────────────────────────
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
   // Users
   const [userSearch, setUserSearch] = useState("");
   const [userFilter, setUserFilter] = useState("ALL");
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  
   const [confirmAction, setConfirmAction] = useState<{ message: string; fn: () => void } | null>(null);
 
   const loadData = async () => {
