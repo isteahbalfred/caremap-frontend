@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { authService } from '../../services/authService';
 
 interface AuthState {
@@ -53,7 +53,25 @@ const authSlice = createSlice({
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
     },
-    clearError: (state) => { state.error = null; },
+    clearError: (state) => {
+      state.error = null;
+    },
+    // ── Utilisé par GoogleCallbackPage après OAuth ──
+    setCredentials: (
+      state,
+      action: PayloadAction<{
+        accessToken: string;
+        refreshToken: string;
+        user: any;
+      }>
+    ) => {
+      const { accessToken, refreshToken, user } = action.payload;
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      state.user = user;
+      state.isAuthenticated = true;
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -79,5 +97,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { logout, clearError, setCredentials } = authSlice.actions;
 export default authSlice.reducer;

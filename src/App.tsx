@@ -4,6 +4,7 @@ import { useAppDispatch } from "./store/hooks";
 import { loadUser } from "./store/slices/authSlice";
 import { ProtectedRoute } from "./components/common/ProtectedRoute";
 import { Spinner } from "./components/ui/Spinner";
+import GoogleCallbackPage from './pages/auth/GoogleCallbackPage';
 
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
@@ -23,7 +24,6 @@ const PageLoader = () => (
 
 function App() {
   const dispatch = useAppDispatch();
-
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (token) dispatch(loadUser());
@@ -32,6 +32,7 @@ function App() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
+        {/* ── Routes publiques ── */}
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/map" element={<MapPage />} />
@@ -39,12 +40,19 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/clinics" element={<ClinicsPage />} />
         <Route path="/medications/:id" element={<MedicationDetailPage />} />
+
+        {/* ── Callback Google OAuth — DOIT être publique ── */}
+        <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
+
+        {/* ── Routes protégées ── */}
         <Route element={<ProtectedRoute role="PHARMACY_ADMIN" />}>
           <Route path="/pharmacy" element={<PharmacyDashboard />} />
         </Route>
+
         <Route element={<ProtectedRoute role="SUPER_ADMIN" />}>
           <Route path="/admin" element={<AdminDashboard />} />
         </Route>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
