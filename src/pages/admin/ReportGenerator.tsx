@@ -429,7 +429,7 @@ export default function ReportGenerator() {
                 <input
                   type="text"
                   className="input mt-1 bg-gray-50 text-gray-500"
-                  value={member.branch}
+                    value={member.branch}
                   readOnly
                 />
               </div>
