@@ -1,4 +1,4 @@
-import { DashboardStats, PendingPharmacy, User, Medication, Category } from "../../types";
+﻿import { DashboardStats, PendingPharmacy, User, Medication, Category } from "../../types";
 import { useState, useEffect, useRef } from "react";
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import { logout } from "../../store/slices/authSlice";
@@ -39,18 +39,18 @@ function Chatbot() {
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 1000,
-          system: `Tu es l'assistant administrateur de CareMap, une plateforme m?dicale ha?tienne. 
-Tu aides l'administrateur ? g?rer les utilisateurs, pharmacies, m?dicaments et cliniques.
-R?ponds toujours en fran?ais, de mani?re concise et utile. 
-Si on te demande comment faire quelque chose dans l'interface, explique les ?tapes clairement.`,
+          system: `Tu es l'assistant administrateur de CareMap, une plateforme médicale haïtienne. 
+Tu aides l'administrateur à gérer les utilisateurs, pharmacies, médicaments et cliniques.
+Réponds toujours en français, de manière concise et utile. 
+Si on te demande comment faire quelque chose dans l'interface, explique les étapes clairement.`,
           messages: [{ role: 'user', content: text }],
         }),
       });
       const data = await res.json();
-      const reply = data.content?.[0]?.text || 'D?sol?, je n\'ai pas pu r?pondre.';
+      const reply = data.content?.[0]?.text || 'Désolé, je n\'ai pas pu répondre.';
       setMsgs(m => [...m, { role: 'bot', text: reply }]);
     } catch {
-      setMsgs(m => [...m, { role: 'bot', text: 'Erreur de connexion. R?essayez.' }]);
+      setMsgs(m => [...m, { role: 'bot', text: 'Erreur de connexion. Réessayez.' }]);
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,7 @@ Si on te demande comment faire quelque chose dans l'interface, explique les ?tap
         )}
       </button>
 
-      {/* Fen?tre chat */}
+      {/* Fenêtre chat */}
       {open && (
         <div className="fixed bottom-24 right-6 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden" style={{ height: '420px' }}>
           {/* Header */}
@@ -122,7 +122,7 @@ Si on te demande comment faire quelque chose dans l'interface, explique les ?tap
           <div className="p-3 bg-white border-t border-gray-100 flex gap-2">
             <input
               className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400"
-              placeholder="Posez votre question?"
+              placeholder="Posez votre question…"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && send()}
@@ -172,7 +172,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("stats");
 
-  // M?dicaments
+  // Médicaments
   const [medForm, setMedForm] = useState({ name: "", genericName: "", description: "", categoryId: "" });
   const [editingMed, setEditingMed] = useState<Medication | null>(null);
   const [medLoading, setMedLoading] = useState(false);
@@ -223,7 +223,7 @@ export default function AdminDashboard() {
 
   const handleDeleteUser = async (id: string) => {
     setConfirmAction({
-      message: 'Supprimer d?finitivement cet utilisateur ? Cette action est irr?versible.',
+      message: 'Supprimer définitivement cet utilisateur ? Cette action est irréversible.',
       fn: async () => {
         try { await adminService.toggleUser(id); } catch {}
         setConfirmAction(null);
@@ -233,20 +233,20 @@ export default function AdminDashboard() {
   };
 
   const handleMedSubmit = async () => {
-    if (!medForm.name || !medForm.categoryId) { setMedMessage("Le nom et la cat?gorie sont obligatoires."); return; }
+    if (!medForm.name || !medForm.categoryId) { setMedMessage("Le nom et la catégorie sont obligatoires."); return; }
     setMedLoading(true); setMedMessage("");
     try {
       if (editingMed) {
         await medicationService.update(editingMed.id, medForm);
-        setMedMessage("? M?dicament modifi? avec succ?s.");
+        setMedMessage("✅ Médicament modifié avec succès.");
       } else {
         await medicationService.create(medForm);
-        setMedMessage("? M?dicament ajout? avec succ?s.");
+        setMedMessage("✅ Médicament ajouté avec succès.");
       }
       setMedForm({ name: "", genericName: "", description: "", categoryId: "" });
       setEditingMed(null);
       loadMedications();
-    } catch { setMedMessage("? Une erreur est survenue."); }
+    } catch { setMedMessage("❌ Une erreur est survenue."); }
     finally { setMedLoading(false); }
   };
 
@@ -259,10 +259,10 @@ export default function AdminDashboard() {
 
   const handleDeleteMed = async (id: string) => {
     setConfirmAction({
-      message: 'Supprimer ce m?dicament ?',
+      message: 'Supprimer ce médicament ?',
       fn: async () => {
-        try { await medicationService.update(id, { name: "__deleted__" }); setMedMessage("? M?dicament supprim?."); loadMedications(); }
-        catch { setMedMessage("? Erreur lors de la suppression."); }
+        try { await medicationService.update(id, { name: "__deleted__" }); setMedMessage("✅ Médicament supprimé."); loadMedications(); }
+        catch { setMedMessage("❌ Erreur lors de la suppression."); }
         setConfirmAction(null);
       }
     });
@@ -285,11 +285,11 @@ export default function AdminDashboard() {
   );
 
   const tabs = [
-    { key: "stats", label: "Vue d'ensemble", icon: "??" },
-    { key: "pharmacies", label: `Validations`, badge: pending.length, icon: "??" },
-    { key: "users", label: "Utilisateurs", icon: "??" },
-    { key: "medications", label: "M?dicaments", icon: "??" },
-    { key: "report", label: "Rapport", icon: "??" },
+    { key: "stats", label: "Vue d'ensemble", icon: "📊" },
+    { key: "pharmacies", label: `Validations`, badge: pending.length, icon: "🏪" },
+    { key: "users", label: "Utilisateurs", icon: "👥" },
+    { key: "medications", label: "Médicaments", icon: "💊" },
+    { key: "report", label: "Rapport", icon: "📄" },
   ];
 
   const roleColors: Record<string, string> = {
@@ -306,7 +306,7 @@ export default function AdminDashboard() {
       <nav className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between sticky top-0 z-30 shadow-sm">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-2">
-            <span className="text-xl">???</span>
+            <span className="text-xl">🗺️</span>
             <span className="text-lg font-bold text-primary-700">CareMap</span>
           </Link>
           <span className="text-gray-300">|</span>
@@ -329,7 +329,7 @@ export default function AdminDashboard() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            D?connexion
+            Déconnexion
           </button>
         </div>
       </nav>
@@ -371,12 +371,12 @@ export default function AdminDashboard() {
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {[
-                    { label: "Utilisateurs", value: stats?.totalUsers ?? 0, icon: "??", color: "bg-blue-50 text-blue-600 border-blue-100" },
-                    { label: "Pharmacies totales", value: stats?.totalPharmacies ?? 0, icon: "??", color: "bg-green-50 text-green-600 border-green-100" },
-                    { label: "Pharmacies valid?es", value: stats?.validatedPharmacies ?? 0, icon: "?", color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
-                    { label: "En attente", value: stats?.pendingPharmacies ?? 0, icon: "?", color: "bg-amber-50 text-amber-600 border-amber-100" },
-                    { label: "Cliniques", value: stats?.totalClinics ?? 0, icon: "??", color: "bg-purple-50 text-purple-600 border-purple-100" },
-                    { label: "M?dicaments", value: stats?.totalMedications ?? 0, icon: "??", color: "bg-red-50 text-red-600 border-red-100" },
+                    { label: "Utilisateurs", value: stats?.totalUsers ?? 0, icon: "👥", color: "bg-blue-50 text-blue-600 border-blue-100" },
+                    { label: "Pharmacies totales", value: stats?.totalPharmacies ?? 0, icon: "🏪", color: "bg-green-50 text-green-600 border-green-100" },
+                    { label: "Pharmacies validées", value: stats?.validatedPharmacies ?? 0, icon: "✅", color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
+                    { label: "En attente", value: stats?.pendingPharmacies ?? 0, icon: "⏳", color: "bg-amber-50 text-amber-600 border-amber-100" },
+                    { label: "Cliniques", value: stats?.totalClinics ?? 0, icon: "🏥", color: "bg-purple-50 text-purple-600 border-purple-100" },
+                    { label: "Médicaments", value: stats?.totalMedications ?? 0, icon: "💊", color: "bg-red-50 text-red-600 border-red-100" },
                   ].map(stat => (
                     <div key={stat.label} className={`bg-white rounded-2xl p-5 border ${stat.color.split(' ')[2]} shadow-sm`}>
                       <div className="flex items-center justify-between mb-3">
@@ -388,12 +388,12 @@ export default function AdminDashboard() {
                   ))}
                 </div>
 
-                {/* Activit? rapide */}
+                {/* Activité rapide */}
                 {pending.length > 0 && (
                   <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">?</span>
+                        <span className="text-2xl">⏳</span>
                         <div>
                           <p className="font-semibold text-amber-800">
                             {pending.length} pharmacie{pending.length > 1 ? 's' : ''} en attente de validation
@@ -405,7 +405,7 @@ export default function AdminDashboard() {
                         onClick={() => setActiveTab('pharmacies')}
                         className="px-4 py-2 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600 transition-colors"
                       >
-                        Traiter ?
+                        Traiter →
                       </button>
                     </div>
                   </div>
@@ -418,22 +418,22 @@ export default function AdminDashboard() {
               <div className="space-y-4">
                 {pending.length === 0 ? (
                   <div className="bg-white rounded-2xl p-12 text-center border border-gray-100 shadow-sm">
-                    <div className="text-5xl mb-3">?</div>
+                    <div className="text-5xl mb-3">✅</div>
                     <p className="text-gray-500 font-medium">Aucune pharmacie en attente</p>
-                    <p className="text-gray-400 text-sm mt-1">Toutes les demandes ont ?t? trait?es</p>
+                    <p className="text-gray-400 text-sm mt-1">Toutes les demandes ont été traitées</p>
                   </div>
                 ) : pending.map(p => (
                   <div key={p.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0">??</div>
+                        <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0">🏪</div>
                         <div>
                           <h3 className="font-bold text-gray-900">{p.name}</h3>
                           <p className="text-sm text-gray-500">{p.address}, {p.city}</p>
                           <p className="text-sm text-gray-500">{p.phone}</p>
                           {p.admin && (
                             <p className="text-xs text-gray-400 mt-1.5 bg-gray-50 px-2 py-1 rounded-lg inline-block">
-                              ?? {p.admin.firstName} {p.admin.lastName} ? {p.admin.email}
+                              👤 {p.admin.firstName} {p.admin.lastName} • {p.admin.email}
                             </p>
                           )}
                         </div>
@@ -469,7 +469,7 @@ export default function AdminDashboard() {
                     </svg>
                     <input
                       className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400"
-                      placeholder="Rechercher un utilisateur?"
+                      placeholder="Rechercher un utilisateur…"
                       value={userSearch}
                       onChange={e => setUserSearch(e.target.value)}
                     />
@@ -479,7 +479,7 @@ export default function AdminDashboard() {
                     value={userFilter}
                     onChange={e => setUserFilter(e.target.value)}
                   >
-                    <option value="ALL">Tous les r?les</option>
+                    <option value="ALL">Tous les rôles</option>
                     <option value="PATIENT">Patients</option>
                     <option value="PHARMACY_ADMIN">Pharmaciens</option>
                     <option value="CLINIC_ADMIN">Cliniques</option>
@@ -491,7 +491,7 @@ export default function AdminDashboard() {
 
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                   {filteredUsers.length === 0 ? (
-                    <div className="p-12 text-center text-gray-400">Aucun r?sultat</div>
+                    <div className="p-12 text-center text-gray-400">Aucun résultat</div>
                   ) : filteredUsers.map(u => (
                     <div
                       key={u.id}
@@ -520,11 +520,11 @@ export default function AdminDashboard() {
                             {/* Toggle actif/inactif */}
                             <button
                               onClick={() => setConfirmAction({
-                                message: `${u.isActive ? 'R?voquer' : 'R?activer'} le compte de ${u.firstName} ${u.lastName} ?`,
+                                message: `${u.isActive ? 'Révoquer' : 'Réactiver'} le compte de ${u.firstName} ${u.lastName} ?`,
                                 fn: () => { handleToggleUser(u.id); setConfirmAction(null); }
                               })}
                               className={`p-1.5 rounded-lg transition-colors ${u.isActive ? 'text-amber-600 hover:bg-amber-50' : 'text-green-600 hover:bg-green-50'}`}
-                              title={u.isActive ? 'R?voquer' : 'R?activer'}
+                              title={u.isActive ? 'Révoquer' : 'Réactiver'}
                             >
                               {u.isActive ? (
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -566,26 +566,26 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* -- M?DICAMENTS -- */}
+            {/* -- MÉDICAMENTS -- */}
             {activeTab === "medications" && (
               <div className="space-y-6">
                 {/* Formulaire */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                   <h3 className="text-base font-bold text-gray-800 mb-5">
-                    {editingMed ? `?? Modifier ? ${editingMed.name}` : '? Ajouter un m?dicament'}
+                    {editingMed ? `✏️ Modifier « ${editingMed.name} »` : '➕ Ajouter un médicament'}
                   </h3>
 
                   {medMessage && (
-                    <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium ${medMessage.includes('?') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                    <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium ${medMessage.includes('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                       {medMessage}
                     </div>
                   )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                      { label: 'Nom du m?dicament *', key: 'name', placeholder: 'ex: Amoxicilline 500mg' },
-                      { label: 'Nom g?n?rique', key: 'genericName', placeholder: 'ex: Amoxicilline' },
-                      { label: 'Description', key: 'description', placeholder: 'ex: Antibiotique ? large spectre' },
+                      { label: 'Nom du médicament *', key: 'name', placeholder: 'ex: Amoxicilline 500mg' },
+                      { label: 'Nom générique', key: 'genericName', placeholder: 'ex: Amoxicilline' },
+                      { label: 'Description', key: 'description', placeholder: 'ex: Antibiotique à large spectre' },
                     ].map(f => (
                       <div key={f.key}>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">{f.label}</label>
@@ -599,13 +599,13 @@ export default function AdminDashboard() {
                       </div>
                     ))}
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cat?gorie *</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Catégorie *</label>
                       <select
                         className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:bg-white transition-all"
                         value={medForm.categoryId}
                         onChange={e => setMedForm({ ...medForm, categoryId: e.target.value })}
                       >
-                        <option value="">Choisir une cat?gorie?</option>
+                        <option value="">Choisir une catégorie…</option>
                         {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                       </select>
                     </div>
@@ -617,7 +617,7 @@ export default function AdminDashboard() {
                       disabled={medLoading}
                       className="px-6 py-2.5 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 transition-colors disabled:opacity-50"
                     >
-                      {medLoading ? 'En cours?' : editingMed ? 'Enregistrer les modifications' : 'Ajouter le m?dicament'}
+                      {medLoading ? 'En cours…' : editingMed ? 'Enregistrer les modifications' : 'Ajouter le médicament'}
                     </button>
                     {editingMed && (
                       <button
@@ -633,14 +633,14 @@ export default function AdminDashboard() {
                 {/* Liste */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-4">
-                    <h3 className="text-base font-bold text-gray-800">M?dicaments ({medications.length})</h3>
+                    <h3 className="text-base font-bold text-gray-800">Médicaments ({medications.length})</h3>
                     <div className="relative flex-1 max-w-xs">
                       <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
                       <input
                         className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400"
-                        placeholder="Rechercher?"
+                        placeholder="Rechercher…"
                         value={medSearch}
                         onChange={e => setMedSearch(e.target.value)}
                       />
@@ -650,11 +650,11 @@ export default function AdminDashboard() {
                     {filteredMeds.map(med => (
                       <div key={med.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center text-base">??</div>
+                          <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center text-base">💊</div>
                           <div>
                             <p className="font-semibold text-gray-800 text-sm">{med.name}</p>
                             <p className="text-xs text-gray-400">
-                              {med.category?.name}{med.genericName ? ` ? ${med.genericName}` : ''}
+                              {med.category?.name}{med.genericName ? ` • ${med.genericName}` : ''}
                             </p>
                           </div>
                         </div>
