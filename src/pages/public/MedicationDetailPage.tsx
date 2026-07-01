@@ -4,6 +4,10 @@ import { useParams, Link } from "react-router-dom";
 import { medicationService } from "../../services/medicationService";
 import { Spinner } from "../../components/ui/Spinner";
 import { Badge } from "../../components/ui/Badge";
+import { ContactButtons } from "../../components/common/ContactButtons";
+import { AskAssistantButton } from "../../components/common/AskAssistantButton";
+import { RecentSearches } from "../../components/common/RecentSearches";
+import { searchHistoryService, getActiveUserId } from "../../services/searchHistoryService";
 
 export default function MedicationDetailPage() {
   const { id } = useParams();
@@ -19,6 +23,20 @@ export default function MedicationDetailPage() {
       .catch(() => setError("Medicament introuvable."))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Historique de recherche : on enregistre la consultation de cette fiche
+  // une fois le médicament chargé avec succès (uniquement si connecté).
+  useEffect(() => {
+    if (!medication || !id) return;
+    const userId = getActiveUserId();
+    if (userId === 'guest') return;
+    searchHistoryService.add(userId, {
+      type: 'medication',
+      label: medication.name,
+      subtitle: medication.category ? medication.category.name : undefined,
+      url: `/medication/${id}`,
+    });
+  }, [medication, id]);
 
   const getStockLabel = (stock: MedicationStock) => {
     if (stock.quantity === 0) return "Rupture";
@@ -61,6 +79,7 @@ export default function MedicationDetailPage() {
     : null;
 
   const availableStocks = medication.stocks ? medication.stocks.filter(s => s.quantity > 0) : [];
+  const isTotallyUnavailable = !medication.stocks || medication.stocks.length === 0 || availableStocks.length === 0;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -81,11 +100,17 @@ export default function MedicationDetailPage() {
                   Generique : {medication.genericName}
                 </p>
               )}
-              <div className="flex items-center gap-3 mt-3">
+              <div className="flex items-center gap-3 mt-3 flex-wrap">
                 <Badge variant="info">{medication.category ? medication.category.name : ""}</Badge>
                 <span className="text-white/60 text-sm">
                   {medication.stocks ? medication.stocks.length : 0} pharmacie(s)
                 </span>
+                {/* Point 6 : bouton pour demander à l'assistant des infos sur ce médicament */}
+                <AskAssistantButton
+                  message={`Parle-moi du médicament "${medication.name}" : à quoi sert-il, et où puis-je le trouver ?`}
+                  label="Demander à l'assistant"
+                  className="!bg-white/10 !border-white/20 !text-white hover:!bg-white/20"
+                />
               </div>
             </div>
             <div className="bg-white/10 backdrop-blur rounded-2xl px-6 py-4 text-right">
@@ -132,6 +157,25 @@ export default function MedicationDetailPage() {
           </div>
         </div>
 
+        {/* Point 3 : si le médicament n'est disponible nulle part, on propose une alternative */}
+        {isTotallyUnavailable && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center space-y-3">
+            <p className="text-2xl">😕</p>
+            <p className="font-semibold text-gray-800">
+              {medication.name} n'est actuellement disponible dans aucune pharmacie partenaire.
+            </p>
+            <p className="text-sm text-gray-600">
+              L'assistant peut vous proposer un équivalent ou une pharmacie susceptible de le commander.
+            </p>
+            <div className="flex justify-center">
+              <AskAssistantButton
+                message={`Le médicament "${medication.name}" n'est disponible nulle part sur CareMap. Peux-tu me proposer une alternative ou un équivalent générique ?`}
+                label="Proposer une alternative"
+              />
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-5 border-b border-gray-100">
             <h2 className="text-lg font-bold text-gray-800">
@@ -148,18 +192,28 @@ export default function MedicationDetailPage() {
           ) : (
             <div className="divide-y divide-gray-50">
               {medication.stocks.map(stock => (
-                <div key={stock.id} className="px-5 py-4 flex items-center justify-between hover:bg-gray-50">
+                <div key={stock.id} className="px-5 py-4 flex items-center justify-between flex-wrap gap-3 hover:bg-gray-50">
                   <div>
-                    <p className="font-semibold text-gray-800 text-lg">
-                      {stock.pharmacy ? stock.pharmacy.name : ""}
-                    </p>
+                    {stock.pharmacy ? (
+                      <Link
+                        to={`/map?focus=pharmacy-${stock.pharmacy.id}`}
+                        className="font-semibold text-gray-800 text-lg hover:text-primary-600 transition-colors"
+                        title="Voir sur la carte et calculer l'itinéraire"
+                      >
+                        {stock.pharmacy.name} 📍
+                      </Link>
+                    ) : (
+                      <p className="font-semibold text-gray-800 text-lg"></p>
+                    )}
                     <p className="text-sm text-gray-500">
                       {stock.pharmacy ? stock.pharmacy.city : ""} —{" "}
                       {stock.pharmacy ? stock.pharmacy.address : ""}
                     </p>
-                    <p className="text-sm text-gray-400">
-                      {stock.pharmacy ? stock.pharmacy.phone : ""}
-                    </p>
+                    {stock.pharmacy?.phone && (
+                      <div className="mt-2">
+                        <ContactButtons phone={stock.pharmacy.phone} name={stock.pharmacy.name} size="sm" />
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-xl font-bold text-primary-600">
@@ -174,6 +228,9 @@ export default function MedicationDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Point 1 & 4 : historique de recherche cliquable, du plus récent au plus ancien */}
+        <RecentSearches />
 
         <div className="text-center pb-8">
           <Link

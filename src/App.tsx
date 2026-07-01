@@ -1,10 +1,11 @@
 ﻿import { useEffect, lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { useAppDispatch } from "./store/hooks";
+import { useAppDispatch, useAppSelector } from "./store/hooks";
 import { loadUser } from "./store/slices/authSlice";
 import { ProtectedRoute } from "./components/common/ProtectedRoute";
 import { Spinner } from "./components/ui/Spinner";
 import GoogleCallbackPage from './pages/auth/GoogleCallbackPage';
+import Chatbot from "./components/Chatbot";
 
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
@@ -24,6 +25,8 @@ const PageLoader = () => (
 
 function App() {
   const dispatch = useAppDispatch();
+  const { user } = useAppSelector((s) => s.auth);
+
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (token) dispatch(loadUser());
@@ -55,6 +58,9 @@ function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {/* Chatbot flottant, visible sur toutes les pages pour les utilisateurs connectés */}
+      {user && <Chatbot />}
     </Suspense>
   );
 }

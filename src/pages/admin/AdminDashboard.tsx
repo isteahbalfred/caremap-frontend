@@ -1,5 +1,5 @@
 ﻿import { DashboardStats, PendingPharmacy, User, Medication, Category } from "../../types";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import { logout } from "../../store/slices/authSlice";
 import { adminService } from "../../services/adminService";
@@ -10,138 +10,6 @@ import { Spinner } from "../../components/ui/Spinner";
 
 import ReportGenerator from "./ReportGenerator";
 
-// -- Chatbot -------------------------------------------------
-interface ChatMsg { role: 'user' | 'bot'; text: string; }
-
-function Chatbot() {
-  const [open, setOpen] = useState(false);
-  const [input, setInput] = useState('');
-  const [msgs, setMsgs] = useState<ChatMsg[]>([
-    { role: 'bot', text: 'Bonjour ! Je suis l\'assistant CareMap. Comment puis-je vous aider ?' }
-  ]);
-  const [loading, setLoading] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [msgs]);
-
-  const send = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
-    setInput('');
-    setMsgs(m => [...m, { role: 'user', text }]);
-    setLoading(true);
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          system: `Tu es l'assistant administrateur de CareMap, une plateforme médicale haïtienne. 
-Tu aides l'administrateur à gérer les utilisateurs, pharmacies, médicaments et cliniques.
-Réponds toujours en français, de manière concise et utile. 
-Si on te demande comment faire quelque chose dans l'interface, explique les étapes clairement.`,
-          messages: [{ role: 'user', content: text }],
-        }),
-      });
-      const data = await res.json();
-      const reply = data.content?.[0]?.text || 'Désolé, je n\'ai pas pu répondre.';
-      setMsgs(m => [...m, { role: 'bot', text: reply }]);
-    } catch {
-      setMsgs(m => [...m, { role: 'bot', text: 'Erreur de connexion. Réessayez.' }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <>
-      {/* Bouton flottant */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105"
-        title="Assistant CareMap"
-      >
-        {open ? (
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        ) : (
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-          </svg>
-        )}
-      </button>
-
-      {/* Fenêtre chat */}
-      {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden" style={{ height: '420px' }}>
-          {/* Header */}
-          <div className="bg-primary-600 px-4 py-3 flex items-center gap-3">
-            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-white text-sm font-semibold">Assistant CareMap</p>
-              <p className="text-primary-200 text-xs">Toujours disponible</p>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-            {msgs.map((m, i) => (
-              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${
-                  m.role === 'user'
-                    ? 'bg-primary-600 text-white rounded-br-sm'
-                    : 'bg-white text-gray-700 shadow-sm border border-gray-100 rounded-bl-sm'
-                }`}>
-                  {m.text}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-white px-3 py-2 rounded-2xl rounded-bl-sm shadow-sm border border-gray-100">
-                  <div className="flex gap-1 items-center h-4">
-                    {[0,1,2].map(i => (
-                      <div key={i} className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          {/* Input */}
-          <div className="p-3 bg-white border-t border-gray-100 flex gap-2">
-            <input
-              className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-primary-400"
-              placeholder="Posez votre question…"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && send()}
-            />
-            <button
-              onClick={send}
-              disabled={loading || !input.trim()}
-              className="w-9 h-9 bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white rounded-xl flex items-center justify-center transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
 
 // -- Modal confirmation ---------------------------------------
 function ConfirmModal({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
@@ -683,9 +551,6 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
-
-      {/* Chatbot flottant */}
-      <Chatbot />
 
       {/* Modal de confirmation */}
       {confirmAction && (
