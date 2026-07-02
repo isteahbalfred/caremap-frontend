@@ -43,6 +43,111 @@ const userIcon = L.divIcon({
   iconAnchor: [8, 8],
 });
 
+/* ============================================================================
+   GÉOCODAGE AUTOMATIQUE (fallback)
+   ----------------------------------------------------------------------------
+   Les cliniques/pharmacies créées via les formulaires admin/pharmacien n'ont
+   pour l'instant pas de sélecteur de coordonnées GPS précises — seuls
+   département/ville/adresse texte sont saisis. Sans ce fallback, tout élément
+   sans latitude/longitude était silencieusement invisible sur la carte.
+   On résout donc une position approximative (au niveau de la ville) via
+   Nominatim (OpenStreetMap), avec mise en cache locale pour éviter de
+   re-géocoder à chaque visite.
+
+   IMPORTANT — correctif : Nominatim impose une politique stricte d'1 requête
+   par seconde MAXIMUM, tous appels confondus. Avant, pharmacies et cliniques
+   géocodaient chacune de leur côté avec leur propre délai, ce qui pouvait
+   facilement dépasser cette limite quand les deux se chargeaient en même
+   temps (jusqu'à ~2 req/s). Nominatim se met alors à refuser une partie des
+   requêtes (403/429), et comme l'erreur était avalée silencieusement, les
+   établissements concernés restaient invisibles sans qu'on comprenne pourquoi
+   (typiquement : tout marche sauf certaines cliniques, dont les succursales).
+
+   On utilise donc désormais UNE SEULE file d'attente partagée pour tous les
+   géocodages (pharmacies + cliniques), et on logue les échecs dans la console
+   pour pouvoir diagnostiquer facilement.
+   ============================================================================ */
+
+const GEOCODE_CACHE_KEY = 'caremap_geocode_cache_v1';
+
+function loadGeocodeCache(): Record<string, [number, number] | null> {
+  try {
+    return JSON.parse(localStorage.getItem(GEOCODE_CACHE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveGeocodeCache(cache: Record<string, [number, number] | null>) {
+  try {
+    localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // stockage plein ou indisponible — pas bloquant, on continuera sans cache persistant
+  }
+}
+
+// File d'attente GLOBALE (partagée entre pharmacies et cliniques) pour ne
+// jamais dépasser la limite d'1 req/s imposée par Nominatim.
+let geocodeQueueTail: Promise<void> = Promise.resolve();
+
+function scheduleGeocode(task: () => Promise<void>): void {
+  geocodeQueueTail = geocodeQueueTail
+    .then(() => task())
+    .catch((err) => {
+      console.warn('[CareMap] Échec pendant le géocodage:', err);
+    })
+    .then(() => new Promise<void>((resolve) => setTimeout(resolve, 1100)));
+}
+
+async function geocodeCityDepartment(city?: string, department?: string): Promise<[number, number] | null> {
+  if (!city) return null;
+  const key = `${city}|${department || ''}`.toLowerCase();
+  const cache = loadGeocodeCache();
+  if (key in cache) return cache[key];
+
+  const query = [city, department, 'Haïti'].filter(Boolean).join(', ');
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ht&q=${encodeURIComponent(query)}`
+    );
+    if (!res.ok) {
+      // Ne pas mettre en cache un échec réseau/rate-limit temporaire (ex: 429) :
+      // on retentera au prochain chargement de la carte plutôt que de bloquer
+      // l'établissement définitivement.
+      console.warn(`[CareMap] Nominatim a répondu ${res.status} pour la requête "${query}"`);
+      return null;
+    }
+    const data = await res.json();
+    const coords: [number, number] | null =
+      data?.[0] ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
+    cache[key] = coords;
+    saveGeocodeCache(cache);
+    if (!coords) {
+      console.warn(`[CareMap] Aucun résultat de géocodage pour "${query}"`);
+    }
+    return coords;
+  } catch (err) {
+    console.warn(`[CareMap] Erreur réseau de géocodage pour "${query}":`, err);
+    return null;
+  }
+}
+
+// Résout les coordonnées manquantes via la file d'attente partagée ci-dessus.
+// Les marqueurs apparaissent progressivement au fur et à mesure des résolutions.
+function resolveMissingCoordinates(
+  items: any[],
+  onResolved: (id: string, coords: [number, number]) => void
+) {
+  items.forEach((item) => {
+    if (item.latitude != null && item.longitude != null) return;
+    if (!item.city) return;
+    scheduleGeocode(async () => {
+      const coords = await geocodeCityDepartment(item.city, item.department);
+      if (coords) onResolved(item.id, coords);
+    });
+  });
+}
+
 // -- Modes de transport ------------------------------------------------------
 type TransportKey = 'foot' | 'bike' | 'moto' | 'car';
 
@@ -50,12 +155,7 @@ interface TransportMode {
   key: TransportKey;
   label: string;
   emoji: string;
-  // Vitesse moyenne (km/h) utilisée pour estimer la durée localement.
-  // Le serveur OSRM public gratuit ne fournit fiablement que le profil "voiture" ;
-  // pour les autres modes on calcule donc la durée à partir de la distance réelle
-  // (issue de l'itinéraire routier) et d'une vitesse moyenne réaliste.
   avgSpeedKmh?: number;
-  // Au-delà de cette distance (km), on avertit que ce mode est peu réaliste
   warnBeyondKm?: number;
 }
 
@@ -63,7 +163,7 @@ const TRANSPORT_MODES: TransportMode[] = [
   { key: 'foot', label: 'À pied', emoji: '🚶', avgSpeedKmh: 4.5, warnBeyondKm: 12 },
   { key: 'bike', label: 'Vélo', emoji: '🚲', avgSpeedKmh: 14, warnBeyondKm: 40 },
   { key: 'moto', label: 'Moto', emoji: '🏍️', avgSpeedKmh: 35 },
-  { key: 'car', label: 'Voiture', emoji: '🚗' }, // pas de avgSpeedKmh => durée réelle OSRM utilisée
+  { key: 'car', label: 'Voiture', emoji: '🚗' },
 ];
 
 interface RouteStep {
@@ -73,7 +173,7 @@ interface RouteStep {
 
 interface BaseRoute {
   distanceKm: number;
-  carDurationMin: number; // durée réelle renvoyée par OSRM (profil voiture)
+  carDurationMin: number;
   geometry: [number, number][];
   steps: RouteStep[];
 }
@@ -130,11 +230,6 @@ function formatDuration(min: number): string {
   return m > 0 ? `${h} h ${m} min` : `${h} h`;
 }
 
-// Le serveur OSRM public gratuit (router.project-osrm.org) ne sert fiablement
-// que le profil "voiture" (driving) — demander foot/bike renvoie silencieusement
-// le même itinéraire routier. On ne fait donc qu'un seul appel, et on dérive
-// les durées des autres modes localement via des vitesses moyennes (voir
-// computeDisplayDuration ci-dessous).
 async function fetchBaseRoute(
   from: [number, number],
   to: [number, number]
@@ -160,14 +255,11 @@ async function fetchBaseRoute(
   }
 }
 
-// Durée affichée pour le mode sélectionné : durée réelle OSRM pour la voiture,
-// estimation distance/vitesse-moyenne pour les autres modes.
 function computeDisplayDuration(base: BaseRoute, mode: TransportMode): number {
   if (!mode.avgSpeedKmh) return base.carDurationMin;
   return (base.distanceKm / mode.avgSpeedKmh) * 60;
 }
 
-// -- Petit composant utilitaire pour recentrer la carte -----------------------
 function FlyTo({ position, zoom = 16 }: { position: [number, number] | null; zoom?: number }) {
   const map = useMap();
   useEffect(() => {
@@ -211,11 +303,58 @@ export default function MapPage() {
   // -- Chargement des données --------------------------------------------
   useEffect(() => {
     pharmacyService.getAll({ limit: 50 })
-      .then(res => setPharmacies(res.data.data))
+      .then(res => {
+        const data: any[] = res.data.data ?? [];
+        setPharmacies(data);
+        resolveMissingCoordinates(data, (id, coords) => {
+          setPharmacies(prev =>
+            prev.map(p => (p.id === id ? { ...p, latitude: coords[0], longitude: coords[1], approxLocation: true } : p))
+          );
+        });
+      })
       .finally(() => setLoading(false));
+
     clinicService.getAll({ limit: 50 })
-      .then(res => setClinics(res.data.data))
-      .catch(() => {});
+      .then(res => {
+        const raw: any[] = res.data.data ?? [];
+
+        // Une clinique peut avoir des succursales (additionalLocations) dans
+        // d'autres villes/départements — on les éclate en entrées à part pour
+        // qu'elles apparaissent aussi sur la carte, pas seulement le siège.
+        const expanded: any[] = [];
+        raw.forEach((c) => {
+          expanded.push(c);
+          (c.additionalLocations || []).forEach((loc: any, idx: number) => {
+            expanded.push({
+              id: `${c.id}-branch-${idx}`,
+              name: `${c.name} (${loc.city || loc.department || 'succursale'})`,
+              // Correctif : si la succursale n'a pas sa propre ville/département
+              // renseignés (seulement une adresse texte, par ex.), on hérite de
+              // ceux du siège plutôt que d'abandonner le géocodage — avant, ces
+              // succursales restaient invisibles pour toujours.
+              city: loc.city || c.city,
+              department: loc.department || c.department,
+              address: loc.address,
+              phone: loc.phone || c.phone,
+              // Correctif : si la succursale a déjà des coordonnées précises en
+              // base, on les utilise directement au lieu de forcer un géocodage.
+              latitude: loc.latitude ?? null,
+              longitude: loc.longitude ?? null,
+              branchOf: c.name,
+            });
+          });
+        });
+
+        setClinics(expanded);
+        resolveMissingCoordinates(expanded, (id, coords) => {
+          setClinics(prev =>
+            prev.map(c => (c.id === id ? { ...c, latitude: coords[0], longitude: coords[1], approxLocation: true } : c))
+          );
+        });
+      })
+      .catch((err) => {
+        console.warn('[CareMap] Échec du chargement des cliniques:', err);
+      });
   }, []);
 
   // -- Géolocalisation utilisateur ----------------------------------------
@@ -271,7 +410,8 @@ export default function MapPage() {
       if (c.latitude == null || c.longitude == null) return;
       items.push({
         id: `clinic-${c.id}`, type: 'clinic', name: c.name,
-        subtitle: `Clinique · ${c.city}`, latitude: c.latitude, longitude: c.longitude,
+        subtitle: c.branchOf ? `Succursale de ${c.branchOf} · ${c.city}` : `Clinique · ${c.city}`,
+        latitude: c.latitude, longitude: c.longitude,
       });
     });
     return items;
@@ -300,8 +440,6 @@ export default function MapPage() {
   };
 
   // -- Auto-sélection via lien externe : /map?focus=pharmacy-12 ou clinic-7 --
-  // Permet au chatbot ou à une fiche médicament d'envoyer un lien qui ouvre
-  // directement la carte avec l'itinéraire déjà calculé vers ce lieu.
   const [searchParams] = useSearchParams();
   useEffect(() => {
     const focus = searchParams.get('focus');
@@ -322,14 +460,15 @@ export default function MapPage() {
       if (c && c.latitude != null && c.longitude != null) {
         chooseDestination({
           id: `clinic-${c.id}`, type: 'clinic', name: c.name,
-          subtitle: `Clinique · ${c.city}`, latitude: c.latitude, longitude: c.longitude,
+          subtitle: c.branchOf ? `Succursale de ${c.branchOf}` : `Clinique · ${c.city}`,
+          latitude: c.latitude, longitude: c.longitude,
         });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, pharmacies, clinics]);
 
-  // -- Calcul de l'itinéraire : un seul appel réseau, réutilisé pour tous les modes --
+  // -- Calcul de l'itinéraire -----------------------------------------------
   useEffect(() => {
     if (!destination || !userPosition) return;
     let cancelled = false;
@@ -343,7 +482,6 @@ export default function MapPage() {
     return () => { cancelled = true; };
   }, [destination, userPosition]);
 
-  // Changer de mode ne refait aucune requête : la durée est recalculée localement
   const handleModeChange = (modeKey: TransportKey) => setSelectedMode(modeKey);
 
   const recenterOnUser = () => {
@@ -353,6 +491,12 @@ export default function MapPage() {
   const typeLabel: Record<SearchItem['type'], string> = {
     pharmacy: '🏪', clinic: '🏥', medication: '💊',
   };
+
+  const visiblePharmacies = pharmacies.filter(p => p.latitude != null && p.longitude != null);
+  const visibleClinics = clinics.filter(c => c.latitude != null && c.longitude != null);
+  const pendingGeocodeCount =
+    pharmacies.filter(p => p.latitude == null && p.city).length +
+    clinics.filter(c => c.latitude == null && c.city).length;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -402,6 +546,13 @@ export default function MapPage() {
             )}
           </div>
 
+          {/* Indicateur de géocodage en cours */}
+          {pendingGeocodeCount > 0 && (
+            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              <Spinner /> Localisation de {pendingGeocodeCount} établissement(s) en cours…
+            </div>
+          )}
+
           {/* Carte destination + itinéraire */}
           {destination && (
             <div className="border border-primary-100 bg-primary-50/50 rounded-xl p-3 space-y-3">
@@ -414,7 +565,6 @@ export default function MapPage() {
                 <button onClick={clearDestination} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
               </div>
 
-              {/* Sélecteur de mode de transport */}
               <div className="grid grid-cols-4 gap-1.5">
                 {TRANSPORT_MODES.map((m) => (
                   <button
@@ -432,7 +582,6 @@ export default function MapPage() {
                 ))}
               </div>
 
-              {/* Résultat distance / temps */}
               {!userPosition && !locating && (
                 <p className="text-xs text-amber-600">
                   Position non disponible. Autorisez la géolocalisation pour calculer l'itinéraire.
@@ -473,7 +622,6 @@ export default function MapPage() {
                 </button>
               )}
 
-              {/* Étapes de navigation (basées sur le trajet routier) */}
               {showDirections && baseRoute && (
                 <div className="max-h-56 overflow-y-auto space-y-1.5 pt-1">
                   {baseRoute.steps.map((s, i) => (
@@ -496,7 +644,7 @@ export default function MapPage() {
 
           {/* Liste des pharmacies */}
           <div>
-            <h2 className="font-bold text-gray-800 mb-3">🏪 Pharmacies ({pharmacies.length})</h2>
+            <h2 className="font-bold text-gray-800 mb-3">🏪 Pharmacies ({visiblePharmacies.length}/{pharmacies.length})</h2>
             {loading ? (
               <div className="flex justify-center py-8"><Spinner /></div>
             ) : (
@@ -505,34 +653,78 @@ export default function MapPage() {
                   <div
                     key={p.id}
                     onClick={() => {
+                      if (p.latitude == null || p.longitude == null) return;
                       setSelected(p);
                       chooseDestination({
                         id: `pharm-${p.id}`, type: 'pharmacy', name: p.name,
                         subtitle: `Pharmacie · ${p.city}`, latitude: p.latitude, longitude: p.longitude,
                       });
                     }}
-                    className={`p-3 rounded-lg cursor-pointer border transition-colors ${
+                    className={`p-3 rounded-lg border transition-colors ${
+                      p.latitude == null ? 'opacity-50 cursor-wait' : 'cursor-pointer'
+                    } ${
                       selected?.id === p.id
                         ? 'border-primary-500 bg-primary-50'
                         : 'border-gray-100 hover:border-primary-200'
                     }`}
                   >
                     <p className="font-medium text-gray-800">{p.name}</p>
-                    <p className="text-xs text-gray-500">📍 {p.city}</p>
+                    <p className="text-xs text-gray-500">📍 {p.city}{p.department ? `, ${p.department}` : ''}</p>
                     <p className="text-xs text-gray-500">{p.address}</p>
                     <p className="text-xs text-green-600 mt-1">
                       💊 {p.medications?.length || 0} médicament(s)
                     </p>
+                    {p.latitude == null && <p className="text-xs text-amber-500 mt-1">Localisation en cours…</p>}
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* Liste des cliniques (ajoutée : absente auparavant, les cliniques
+              n'étaient sélectionnables que depuis la carte ou la recherche) */}
+          <div>
+            <h2 className="font-bold text-gray-800 mb-3">🏥 Cliniques ({visibleClinics.length}/{clinics.length})</h2>
+            <div className="space-y-2">
+              {clinics.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => {
+                    if (c.latitude == null || c.longitude == null) return;
+                    chooseDestination({
+                      id: `clinic-${c.id}`, type: 'clinic', name: c.name,
+                      subtitle: c.branchOf ? `Succursale de ${c.branchOf} · ${c.city}` : `Clinique · ${c.city}`,
+                      latitude: c.latitude, longitude: c.longitude,
+                    });
+                  }}
+                  className={`p-3 rounded-lg border transition-colors ${
+                    c.latitude == null ? 'opacity-50 cursor-wait' : 'cursor-pointer'
+                  } ${
+                    destination?.id === `clinic-${c.id}`
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-100 hover:border-primary-200'
+                  }`}
+                >
+                  <p className="font-medium text-gray-800">
+                    {c.name}
+                    {c.branchOf && <span className="text-xs text-purple-600 font-normal"> (succursale)</span>}
+                  </p>
+                  <p className="text-xs text-gray-500">📍 {c.city}{c.department ? `, ${c.department}` : ''}</p>
+                  <p className="text-xs text-gray-500">{c.address}</p>
+                  {c.latitude == null && c.city && (
+                    <p className="text-xs text-amber-500 mt-1">Localisation en cours…</p>
+                  )}
+                  {c.latitude == null && !c.city && (
+                    <p className="text-xs text-red-500 mt-1">Ville manquante : localisation impossible</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Carte */}
         <div className="flex-1 relative">
-          {/* Bouton "Me localiser" style Google Maps */}
           <button
             onClick={recenterOnUser}
             disabled={!userPosition}
@@ -566,7 +758,6 @@ export default function MapPage() {
 
             <FlyTo position={flyTarget} />
 
-            {/* Position de l'utilisateur */}
             {userPosition && (
               <Marker position={userPosition} icon={userIcon}>
                 <Popup>Vous êtes ici</Popup>
@@ -574,71 +765,73 @@ export default function MapPage() {
             )}
 
             {/* Pharmacies */}
-            {pharmacies.map((p) => (
-              p.latitude != null && p.longitude != null && (
-                <Marker
-                  key={p.id}
-                  position={[p.latitude, p.longitude]}
-                  icon={pharmacyIcon}
-                  eventHandlers={{
-                    click: () => {
-                      setSelected(p);
-                      chooseDestination({
-                        id: `pharm-${p.id}`, type: 'pharmacy', name: p.name,
-                        subtitle: `Pharmacie · ${p.city}`, latitude: p.latitude, longitude: p.longitude,
-                      });
-                    },
-                  }}
-                >
-                  <Popup>
-                    <div className="min-w-40">
-                      <p className="font-bold text-gray-800">{p.name}</p>
-                      <p className="text-sm text-gray-500">{p.address}</p>
-                      <p className="text-sm text-gray-500">{p.city}</p>
-                      <p className="text-sm font-medium text-primary-600 mt-1">📞 {p.phone}</p>
-                      <p className="text-xs text-green-600">
-                        💊 {p.medications?.length || 0} médicament(s) disponible(s)
-                      </p>
-                    </div>
-                  </Popup>
-                </Marker>
-              )
+            {visiblePharmacies.map((p) => (
+              <Marker
+                key={p.id}
+                position={[p.latitude, p.longitude]}
+                icon={pharmacyIcon}
+                eventHandlers={{
+                  click: () => {
+                    setSelected(p);
+                    chooseDestination({
+                      id: `pharm-${p.id}`, type: 'pharmacy', name: p.name,
+                      subtitle: `Pharmacie · ${p.city}`, latitude: p.latitude, longitude: p.longitude,
+                    });
+                  },
+                }}
+              >
+                <Popup>
+                  <div className="min-w-40">
+                    <p className="font-bold text-gray-800">{p.name}</p>
+                    <p className="text-sm text-gray-500">{p.address}</p>
+                    <p className="text-sm text-gray-500">{p.city}{p.department ? `, ${p.department}` : ''}</p>
+                    <p className="text-sm font-medium text-primary-600 mt-1">📞 {p.phone}</p>
+                    <p className="text-xs text-green-600">
+                      💊 {p.medications?.length || 0} médicament(s) disponible(s)
+                    </p>
+                    {p.approxLocation && (
+                      <p className="text-xs text-amber-500 mt-1">≈ Position approximative (ville)</p>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
             ))}
 
-            {/* Cliniques */}
-            {clinics.map((c) => (
-              c.latitude != null && c.longitude != null && (
-                <Marker
-                  key={c.id}
-                  position={[c.latitude, c.longitude]}
-                  icon={clinicIcon}
-                  eventHandlers={{
-                    click: () => chooseDestination({
-                      id: `clinic-${c.id}`, type: 'clinic', name: c.name,
-                      subtitle: `Clinique · ${c.city}`, latitude: c.latitude, longitude: c.longitude,
-                    }),
-                  }}
-                >
-                  <Popup>
-                    <div className="min-w-40">
-                      <p className="font-bold text-red-700">🏥 {c.name}</p>
-                      <p className="text-sm text-gray-500">{c.address}</p>
-                      <p className="text-sm text-gray-500">{c.city}</p>
-                      <p className="text-sm font-medium text-primary-600 mt-1">📞 {c.phone}</p>
-                    </div>
-                  </Popup>
-                </Marker>
-              )
+            {/* Cliniques (+ succursales) */}
+            {visibleClinics.map((c) => (
+              <Marker
+                key={c.id}
+                position={[c.latitude, c.longitude]}
+                icon={clinicIcon}
+                eventHandlers={{
+                  click: () => chooseDestination({
+                    id: `clinic-${c.id}`, type: 'clinic', name: c.name,
+                    subtitle: c.branchOf ? `Succursale de ${c.branchOf}` : `Clinique · ${c.city}`,
+                    latitude: c.latitude, longitude: c.longitude,
+                  }),
+                }}
+              >
+                <Popup>
+                  <div className="min-w-40">
+                    <p className="font-bold text-red-700">🏥 {c.name}</p>
+                    {c.branchOf && <p className="text-xs text-purple-600">Succursale de {c.branchOf}</p>}
+                    <p className="text-sm text-gray-500">{c.address}</p>
+                    <p className="text-sm text-gray-500">{c.city}{c.department ? `, ${c.department}` : ''}</p>
+                    <p className="text-sm font-medium text-primary-600 mt-1">📞 {c.phone}</p>
+                    {c.approxLocation && (
+                      <p className="text-xs text-amber-500 mt-1">≈ Position approximative (ville)</p>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
             ))}
 
-            {/* Marqueur destination sélectionnée */}
             {destination && (
               <Marker position={[destination.latitude, destination.longitude]} icon={destinationIcon}>
                 <Popup>{destination.name}</Popup>
               </Marker>
             )}
 
-            {/* Tracé de l'itinéraire */}
             {baseRoute && (
               <Polyline
                 positions={baseRoute.geometry}

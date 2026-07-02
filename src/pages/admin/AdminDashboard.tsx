@@ -4,12 +4,32 @@ import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import { logout } from "../../store/slices/authSlice";
 import { adminService } from "../../services/adminService";
 import { medicationService } from "../../services/medicationService";
+import { clinicService, ClinicPayload } from "../../services/clinicService";
 import { Link, useNavigate } from "react-router-dom";
 import { Spinner } from "../../components/ui/Spinner";
 
-
 import ReportGenerator from "./ReportGenerator";
+import ClinicFormModal from "../../components/admin/ClinicFormModal";
 
+type Clinic = ClinicPayload & {
+  id: string;
+  isValidated?: boolean;
+  isBlocked?: boolean;
+  createdAt?: string;
+};
+
+type Pharmacy = {
+  id: string;
+  name: string;
+  address?: string;
+  city?: string;
+  department?: string;
+  phone?: string;
+  isValidated?: boolean;
+  isActive?: boolean;
+  clinic?: { id: string; name: string; city?: string; department?: string } | null;
+  admin?: { firstName?: string; lastName?: string; email?: string };
+};
 
 // -- Modal confirmation ---------------------------------------
 function ConfirmModal({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
@@ -51,6 +71,23 @@ export default function AdminDashboard() {
   const [userSearch, setUserSearch] = useState("");
   const [userFilter, setUserFilter] = useState("ALL");
 
+  // Cliniques
+  const [clinics, setClinics] = useState<Clinic[]>([]);
+  const [clinicsLoading, setClinicsLoading] = useState(false);
+  const [clinicSearch, setClinicSearch] = useState("");
+  const [clinicDeptFilter, setClinicDeptFilter] = useState("ALL");
+  const [showClinicForm, setShowClinicForm] = useState(false);
+  const [editingClinic, setEditingClinic] = useState<Clinic | null>(null);
+  const [clinicMessage, setClinicMessage] = useState("");
+
+  // Pharmacies (vue complète)
+  const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
+  const [pharmaciesLoading, setPharmaciesLoading] = useState(false);
+  const [pharmacySearch, setPharmacySearch] = useState("");
+  const [pharmacyDeptFilter, setPharmacyDeptFilter] = useState("ALL");
+  const [pharmacyStatusFilter, setPharmacyStatusFilter] = useState<"ALL" | "validated" | "pending" | "blocked">("ALL");
+  const [pharmacyMessage, setPharmacyMessage] = useState("");
+
   const [confirmAction, setConfirmAction] = useState<{ message: string; fn: () => void } | null>(null);
 
   const loadData = async () => {
@@ -77,11 +114,36 @@ export default function AdminDashboard() {
     setCategories(catsRes.data.data);
   };
 
-  useEffect(() => { loadData(); loadMedications(); }, []);
+  const loadClinics = async () => {
+    setClinicsLoading(true);
+    try {
+      const res = await clinicService.adminGetAll();
+      setClinics(res.data.data ?? []);
+    } catch {
+      setClinicMessage("❌ Impossible de charger les cliniques.");
+    } finally {
+      setClinicsLoading(false);
+    }
+  };
+
+  const loadPharmacies = async () => {
+    setPharmaciesLoading(true);
+    try {
+      const res = await adminService.getPharmacies();
+      setPharmacies(res.data.data ?? []);
+    } catch {
+      setPharmacyMessage("❌ Impossible de charger les pharmacies.");
+    } finally {
+      setPharmaciesLoading(false);
+    }
+  };
+
+  useEffect(() => { loadData(); loadMedications(); loadClinics(); loadPharmacies(); }, []);
 
   const handleValidate = async (id: string, validate: boolean) => {
     await adminService.validatePharmacy(id, validate);
     loadData();
+    loadPharmacies();
   };
 
   const handleToggleUser = async (id: string) => {
@@ -136,6 +198,81 @@ export default function AdminDashboard() {
     });
   };
 
+  // -- Cliniques : handlers --------------------------------------
+  const handleOpenAddClinic = () => { setEditingClinic(null); setShowClinicForm(true); };
+  const handleOpenEditClinic = (c: Clinic) => { setEditingClinic(c); setShowClinicForm(true); };
+
+  const handleSaveClinic = async (payload: ClinicPayload) => {
+    if (editingClinic) {
+      await clinicService.update(editingClinic.id, payload);
+      setClinicMessage("✅ Clinique modifiée avec succès.");
+    } else {
+      await clinicService.create(payload);
+      setClinicMessage("✅ Clinique ajoutée avec succès.");
+    }
+    setShowClinicForm(false);
+    setEditingClinic(null);
+    loadClinics();
+  };
+
+  const handleToggleBlockClinic = (c: Clinic) => {
+    setConfirmAction({
+      message: `${c.isBlocked ? 'Débloquer' : 'Bloquer'} la clinique « ${c.name} » ?${!c.isBlocked ? ' Elle ne sera plus visible publiquement.' : ''}`,
+      fn: async () => {
+        try {
+          await clinicService.toggleBlock(c.id, !c.isBlocked);
+          setClinicMessage(c.isBlocked ? "✅ Clinique débloquée." : "✅ Clinique bloquée.");
+        } catch { setClinicMessage("❌ Une erreur est survenue."); }
+        setConfirmAction(null);
+        loadClinics();
+      }
+    });
+  };
+
+  const handleDeleteClinic = (c: Clinic) => {
+    setConfirmAction({
+      message: `Supprimer définitivement « ${c.name} » ? Cette action est irréversible.`,
+      fn: async () => {
+        try {
+          await clinicService.remove(c.id);
+          setClinicMessage("✅ Clinique supprimée.");
+        } catch { setClinicMessage("❌ Une erreur est survenue."); }
+        setConfirmAction(null);
+        loadClinics();
+      }
+    });
+  };
+
+  // -- Pharmacies (vue complète) : handlers --------------------------------------
+  const handleTogglePharmacyStatus = (p: Pharmacy) => {
+    setConfirmAction({
+      message: `${p.isActive === false ? 'Débloquer' : 'Bloquer'} la pharmacie « ${p.name} » ?${p.isActive !== false ? ' Elle ne sera plus visible publiquement.' : ''}`,
+      fn: async () => {
+        try {
+          await adminService.togglePharmacyStatus(p.id, p.isActive === false);
+          setPharmacyMessage(p.isActive === false ? "✅ Pharmacie débloquée." : "✅ Pharmacie bloquée.");
+        } catch { setPharmacyMessage("❌ Une erreur est survenue."); }
+        setConfirmAction(null);
+        loadPharmacies();
+      }
+    });
+  };
+
+  const handleDeletePharmacyAdmin = (p: Pharmacy) => {
+    setConfirmAction({
+      message: `Supprimer définitivement « ${p.name} » ? Cette action est irréversible.`,
+      fn: async () => {
+        try {
+          await adminService.deletePharmacy(p.id);
+          setPharmacyMessage("✅ Pharmacie supprimée.");
+        } catch { setPharmacyMessage("❌ Une erreur est survenue."); }
+        setConfirmAction(null);
+        loadPharmacies();
+        loadData();
+      }
+    });
+  };
+
   const handleLogout = () => {
     dispatch(logout());
     navigate('/login');
@@ -152,9 +289,34 @@ export default function AdminDashboard() {
     (m.name + (m.genericName || '')).toLowerCase().includes(medSearch.toLowerCase())
   );
 
+  const clinicDepartments = Array.from(new Set(clinics.map(c => c.department).filter(Boolean))) as string[];
+
+  const filteredClinics = clinics.filter(c => {
+    const term = clinicSearch.trim().toLowerCase();
+    const matchSearch = !term || (c.name + ' ' + (c.city ?? '') + ' ' + (c.department ?? '')).toLowerCase().includes(term);
+    const matchDept = clinicDeptFilter === 'ALL' || c.department === clinicDeptFilter;
+    return matchSearch && matchDept;
+  });
+
+  const pharmacyDepartments = Array.from(new Set(pharmacies.map(p => p.department).filter(Boolean))) as string[];
+
+  const filteredPharmacies = pharmacies.filter(p => {
+    const term = pharmacySearch.trim().toLowerCase();
+    const matchSearch = !term || (p.name + ' ' + (p.city ?? '') + ' ' + (p.department ?? '')).toLowerCase().includes(term);
+    const matchDept = pharmacyDeptFilter === 'ALL' || p.department === pharmacyDeptFilter;
+    const matchStatus =
+      pharmacyStatusFilter === 'ALL' ? true :
+      pharmacyStatusFilter === 'validated' ? p.isValidated === true :
+      pharmacyStatusFilter === 'pending' ? p.isValidated === false :
+      p.isActive === false;
+    return matchSearch && matchDept && matchStatus;
+  });
+
   const tabs = [
     { key: "stats", label: "Vue d'ensemble", icon: "📊" },
     { key: "pharmacies", label: `Validations`, badge: pending.length, icon: "🏪" },
+    { key: "allpharmacies", label: "Pharmacies", badge: pharmacies.length, icon: "🏬" },
+    { key: "clinics", label: "Cliniques", badge: clinics.length, icon: "🏥" },
     { key: "users", label: "Utilisateurs", icon: "👥" },
     { key: "medications", label: "Médicaments", icon: "💊" },
     { key: "report", label: "Rapport", icon: "📄" },
@@ -165,6 +327,13 @@ export default function AdminDashboard() {
     PHARMACY_ADMIN: 'bg-blue-100 text-blue-700',
     CLINIC_ADMIN: 'bg-purple-100 text-purple-700',
     PATIENT: 'bg-green-100 text-green-700',
+  };
+
+  const contractLabels: Record<string, string> = {
+    GRATUIT: 'Référencement gratuit',
+    STANDARD: 'Standard',
+    PREMIUM: 'Premium',
+    PARTENARIAT: 'Partenariat officiel',
   };
 
   return (
@@ -243,7 +412,7 @@ export default function AdminDashboard() {
                     { label: "Pharmacies totales", value: stats?.totalPharmacies ?? 0, icon: "🏪", color: "bg-green-50 text-green-600 border-green-100" },
                     { label: "Pharmacies validées", value: stats?.validatedPharmacies ?? 0, icon: "✅", color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
                     { label: "En attente", value: stats?.pendingPharmacies ?? 0, icon: "⏳", color: "bg-amber-50 text-amber-600 border-amber-100" },
-                    { label: "Cliniques", value: stats?.totalClinics ?? 0, icon: "🏥", color: "bg-purple-50 text-purple-600 border-purple-100" },
+                    { label: "Cliniques", value: stats?.totalClinics ?? clinics.length, icon: "🏥", color: "bg-purple-50 text-purple-600 border-purple-100" },
                     { label: "Médicaments", value: stats?.totalMedications ?? 0, icon: "💊", color: "bg-red-50 text-red-600 border-red-100" },
                   ].map(stat => (
                     <div key={stat.label} className={`bg-white rounded-2xl p-5 border ${stat.color.split(' ')[2]} shadow-sm`}>
@@ -281,7 +450,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* -- PHARMACIES -- */}
+            {/* -- PHARMACIES (Validations en attente) -- */}
             {activeTab === "pharmacies" && (
               <div className="space-y-4">
                 {pending.length === 0 ? (
@@ -323,6 +492,276 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* -- PHARMACIES (vue complète) -- */}
+            {activeTab === "allpharmacies" && (
+              <div className="space-y-4">
+                {pharmacyMessage && (
+                  <div className={`px-4 py-3 rounded-xl text-sm font-medium ${pharmacyMessage.includes('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                    {pharmacyMessage}
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400"
+                      placeholder="Rechercher une pharmacie, ville, département…"
+                      value={pharmacySearch}
+                      onChange={e => setPharmacySearch(e.target.value)}
+                    />
+                  </div>
+                  <select
+                    className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400"
+                    value={pharmacyDeptFilter}
+                    onChange={e => setPharmacyDeptFilter(e.target.value)}
+                  >
+                    <option value="ALL">Tous les départements</option>
+                    {pharmacyDepartments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <select
+                    className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400"
+                    value={pharmacyStatusFilter}
+                    onChange={e => setPharmacyStatusFilter(e.target.value as any)}
+                  >
+                    <option value="ALL">Tous les statuts</option>
+                    <option value="validated">Validées</option>
+                    <option value="pending">En attente</option>
+                    <option value="blocked">Bloquées</option>
+                  </select>
+                </div>
+
+                <p className="text-sm text-gray-400">{filteredPharmacies.length} pharmacie{filteredPharmacies.length > 1 ? 's' : ''}</p>
+
+                {pharmaciesLoading ? (
+                  <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+                ) : filteredPharmacies.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-12 text-center border border-gray-100 shadow-sm">
+                    <div className="text-5xl mb-3">🏬</div>
+                    <p className="text-gray-500 font-medium">Aucune pharmacie trouvée</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {filteredPharmacies.map(p => (
+                      <div
+                        key={p.id}
+                        className={`bg-white rounded-2xl p-5 shadow-sm border ${p.isActive === false ? 'border-red-200 opacity-75' : 'border-gray-100'}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-bold text-gray-900 truncate">🏪 {p.name}</h3>
+                              {p.isValidated ? (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">Validée</span>
+                              ) : (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">En attente</span>
+                              )}
+                              {p.isActive === false && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-semibold">Bloquée</span>
+                              )}
+                              {p.clinic && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-semibold">
+                                  🏥 Branche de {p.clinic.name}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500 mt-1">
+                              📍 {p.address ? `${p.address}, ` : ''}{p.city}{p.department ? `, ${p.department}` : ''}
+                            </p>
+                            {p.phone && <p className="text-sm text-gray-500">📞 {p.phone}</p>}
+                            {p.admin && (
+                              <p className="text-xs text-gray-400 mt-1.5 bg-gray-50 px-2 py-1 rounded-lg inline-block">
+                                👤 {p.admin.firstName} {p.admin.lastName}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 mt-4 pt-4 border-t border-gray-100">
+                          {p.phone && (
+                            <a href={`tel:${p.phone}`} title="Appeler" className="p-2 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors">
+                              📞
+                            </a>
+                          )}
+                          {p.admin?.email && (
+                            <a href={`mailto:${p.admin.email}?subject=CareMap - Message de l'administration`} title="Email" className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+                              ✉️
+                            </a>
+                          )}
+
+                          {!p.isValidated && (
+                            <button
+                              onClick={() => handleValidate(p.id, true)}
+                              className="ml-auto px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-semibold hover:bg-green-100 transition-colors"
+                            >
+                              Valider
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleTogglePharmacyStatus(p)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                              p.isActive === false ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                            } ${p.isValidated ? 'ml-auto' : ''}`}
+                          >
+                            {p.isActive === false ? 'Débloquer' : 'Bloquer'}
+                          </button>
+                          <button
+                            onClick={() => handleDeletePharmacyAdmin(p)}
+                            className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors"
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* -- CLINIQUES -- */}
+            {activeTab === "clinics" && (
+              <div className="space-y-4">
+                {clinicMessage && (
+                  <div className={`px-4 py-3 rounded-xl text-sm font-medium ${clinicMessage.includes('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                    {clinicMessage}
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400"
+                      placeholder="Rechercher une clinique, ville, département…"
+                      value={clinicSearch}
+                      onChange={e => setClinicSearch(e.target.value)}
+                    />
+                  </div>
+                  <select
+                    className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-400"
+                    value={clinicDeptFilter}
+                    onChange={e => setClinicDeptFilter(e.target.value)}
+                  >
+                    <option value="ALL">Tous les départements</option>
+                    {clinicDepartments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <button
+                    onClick={handleOpenAddClinic}
+                    className="px-5 py-2.5 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 transition-colors whitespace-nowrap"
+                  >
+                    ➕ Ajouter une clinique
+                  </button>
+                </div>
+
+                <p className="text-sm text-gray-400">{filteredClinics.length} clinique{filteredClinics.length > 1 ? 's' : ''}</p>
+
+                {clinicsLoading ? (
+                  <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+                ) : filteredClinics.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-12 text-center border border-gray-100 shadow-sm">
+                    <div className="text-5xl mb-3">🏥</div>
+                    <p className="text-gray-500 font-medium">Aucune clinique trouvée</p>
+                    <p className="text-gray-400 text-sm mt-1">Ajoute la première clinique pour commencer.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {filteredClinics.map(c => {
+                      const whatsappNumber = (c.whatsapp || c.phone || '').replace(/[^\d+]/g, '').replace('+', '');
+                      return (
+                        <div
+                          key={c.id}
+                          className={`bg-white rounded-2xl p-5 shadow-sm border ${c.isBlocked ? 'border-red-200 opacity-75' : 'border-gray-100'}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="font-bold text-gray-900 truncate">🏥 {c.name}</h3>
+                                {c.isValidated && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">Validée</span>
+                                )}
+                                {c.isBlocked && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-semibold">Bloquée</span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-500 mt-1">
+                                📍 {c.address ? `${c.address}, ` : ''}{c.city}, {c.department}
+                              </p>
+                              {c.phone && <p className="text-sm text-gray-500">📞 {c.phone}</p>}
+                              {c.contract?.type && (
+                                <span className="inline-block mt-1.5 text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-semibold">
+                                  📄 {contractLabels[c.contract.type] ?? c.contract.type}
+                                  {c.contract.endDate ? ` · jusqu'au ${new Date(c.contract.endDate).toLocaleDateString('fr-FR')}` : ''}
+                                </span>
+                              )}
+                              {(c.additionalLocations?.length ?? 0) > 0 && (
+                                <p className="text-xs text-gray-400 mt-1.5">
+                                  + {c.additionalLocations!.length} autre{c.additionalLocations!.length > 1 ? 's' : ''} localisation{c.additionalLocations!.length > 1 ? 's' : ''}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {c.services && c.services.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                              {c.services.slice(0, 5).map(s => (
+                                <span key={s} className="text-xs font-medium px-2 py-1 rounded-full bg-primary-50 text-primary-700">{s}</span>
+                              ))}
+                              {c.services.length > 5 && (
+                                <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-50 text-gray-500">+{c.services.length - 5}</span>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-1.5 mt-4 pt-4 border-t border-gray-100">
+                            {c.phone && (
+                              <a href={`tel:${c.phone}`} title="Appeler" className="p-2 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors">
+                                📞
+                              </a>
+                            )}
+                            {whatsappNumber && (
+                              <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noreferrer" title="WhatsApp" className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors">
+                                💬
+                              </a>
+                            )}
+                            {c.email && (
+                              <a href={`mailto:${c.email}?subject=CareMap - Message de l'administration`} title="Email" className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
+                                ✉️
+                              </a>
+                            )}
+                            <button
+                              onClick={() => handleOpenEditClinic(c)}
+                              className="ml-auto px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors"
+                            >
+                              Modifier
+                            </button>
+                            <button
+                              onClick={() => handleToggleBlockClinic(c)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                c.isBlocked ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                              }`}
+                            >
+                              {c.isBlocked ? 'Débloquer' : 'Bloquer'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClinic(c)}
+                              className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors"
+                            >
+                              Supprimer
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -551,6 +990,15 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {/* Modal ajout / édition clinique */}
+      {showClinicForm && (
+        <ClinicFormModal
+          initialData={editingClinic}
+          onClose={() => { setShowClinicForm(false); setEditingClinic(null); }}
+          onSubmit={handleSaveClinic}
+        />
+      )}
 
       {/* Modal de confirmation */}
       {confirmAction && (

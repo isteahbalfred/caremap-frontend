@@ -12,14 +12,24 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Intercepteur réponse — gère les 401
+// Intercepteur réponse — gère les 401 SANS forcer de redirection globale.
+// On nettoie juste les tokens invalides ; c'est ProtectedRoute (via le
+// state Redux `isAuthenticated`) qui décide s'il faut renvoyer vers /login,
+// et seulement pour les routes qui l'exigent réellement.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      window.location.href = '/login';
+      const isAuthRoute =
+        error.config?.url?.includes('/auth/login') ||
+        error.config?.url?.includes('/auth/register');
+
+      // Ne nettoie les tokens que si ce n'est pas une tentative de login/register
+      // qui a simplement échoué (mauvais mot de passe, par ex.)
+      if (!isAuthRoute) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+      }
     }
     return Promise.reject(error);
   }

@@ -7,24 +7,45 @@ import { stockService } from '../../services/stockService';
 import { Spinner } from '../../components/ui/Spinner';
 import { Badge } from '../../components/ui/Badge';
 import StockManagement from './StockManagement';
+import CreatePharmacyForm from '../../components/pharmacy/CreatePharmacyForm';
 
 export default function PharmacyDashboard() {
   const { user } = useAppSelector(s => s.auth);
   const dispatch = useAppDispatch();
   const [dashboard, setDashboard] = useState<any>(null);
   const [alerts, setAlerts] = useState<any>(null);
+  const [hasPharmacy, setHasPharmacy] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'stock'>('overview');
 
-  useEffect(() => {
-    Promise.all([
-      pharmacyService.getDashboard(),
-      stockService.getAlerts(),
-    ]).then(([dashRes, alertRes]) => {
-      setDashboard(dashRes.data.data);
-      setAlerts(alertRes.data.data);
-    }).finally(() => setLoading(false));
-  }, []);
+  const load = () => {
+    setLoading(true);
+    pharmacyService.getDashboard()
+      .then(async (dashRes) => {
+        const data = dashRes.data.data;
+        if (data?.hasPharmacy === false) {
+          setHasPharmacy(false);
+          setDashboard(null);
+          return;
+        }
+        setHasPharmacy(true);
+        setDashboard(data);
+        try {
+          const alertRes = await stockService.getAlerts();
+          setAlerts(alertRes.data.data);
+        } catch {
+          setAlerts(null);
+        }
+      })
+      .catch(() => {
+        // Filet de sécurité si jamais le backend renvoie encore une 404 brute
+        setHasPharmacy(false);
+        setDashboard(null);
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -43,6 +64,8 @@ export default function PharmacyDashboard() {
       <div className="max-w-5xl mx-auto px-6 py-8">
         {loading ? (
           <div className="flex justify-center py-12"><Spinner size="lg" /></div>
+        ) : hasPharmacy === false ? (
+          <CreatePharmacyForm onCreated={load} />
         ) : (
           <>
             {/* Pharmacie info */}
@@ -50,11 +73,19 @@ export default function PharmacyDashboard() {
               <div className="card mb-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-800">
-                      🏪 {dashboard.pharmacy.name}
-                    </h2>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-xl font-bold text-gray-800">
+                        🏪 {dashboard.pharmacy.name}
+                      </h2>
+                      {dashboard.pharmacy.clinic && (
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700">
+                          🏥 Branche de {dashboard.pharmacy.clinic.name}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-gray-500">
                       📍 {dashboard.pharmacy.address}, {dashboard.pharmacy.city}
+                      {dashboard.pharmacy.department ? ` (${dashboard.pharmacy.department})` : ''}
                     </p>
                     <p className="text-gray-500">📞 {dashboard.pharmacy.phone}</p>
                   </div>
